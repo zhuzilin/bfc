@@ -57,9 +57,7 @@ int main(int argc, char* argv[]) {
   buffer << file.rdbuf();
   std::string source = buffer.str();
 
-  std::cout << "source size: " << source.size() << std::endl;
   std::vector<instruct_t> insts = compact(source);
-  std::cout << "insts size: " << insts.size() << std::endl;
 
   size_t lbracket_array[30000] = {0}; size_t* lbracket = lbracket_array;
   char array[30000] = {0}; char *ptr = array;
