@@ -8,7 +8,11 @@
 
 struct instruct_t {
   char c;
-  char count;
+  union {
+    int count;
+    size_t next;
+    size_t prev;
+  };
 };
 
 bool is_cmd(char c) {
@@ -21,19 +25,29 @@ std::vector<instruct_t> compact(const std::string& source) {
   size_t i = 0;
   std::stack<size_t> lbracket;
   while (i < source.size()) {
-    instruct_t inst;
-    inst.c = source[i];
-    inst.count = 1;
+    char c = source[i];
     i++;
-    if (!is_cmd(inst.c)) continue;
-    while (i < source.size() && source[i] == inst.c &&
-           (inst.c == '>' || inst.c == '<' || inst.c == '+' || inst.c == '-')) {
-      i++;
-      inst.count++;
+    if (!is_cmd(c)) continue;
+    instruct_t inst;
+    inst.c = c;
+    if (c == '>' || c == '<' || c == '+' || c == '-') {
+      inst.count = 1;
+      while (i < source.size() && source[i] == c) {
+        i++;
+        inst.count++;
+      }
+      if (c == '<') {
+        inst.count = -inst.count;
+        inst.c = '>';
+      }
+      if (c == '-') {
+        inst.count = -inst.count;
+        inst.c = '+';
+      }
     }
     insts.push_back(inst);
   }
-  
+
   for (size_t i = 0; i < insts.size(); i++) {
     if (insts[i].c == '[') {
       lbracket.push(i);
@@ -41,6 +55,10 @@ std::vector<instruct_t> compact(const std::string& source) {
       if (lbracket.size() == 0) {
         throw std::runtime_error("no pairing '[' for ']'");
       }
+      size_t j = lbracket.top();
+      lbracket.pop();
+      insts[j].next = i + 1;
+      insts[i].prev = j + 1;
     }
   }
   return insts;
@@ -66,37 +84,18 @@ int main(int argc, char* argv[]) {
   while (pc < insts.size()) {
     instruct_t inst = insts[pc];
     switch (inst.c) {
-      case '>': ptr += inst.count; break;
-      case '<': ptr -= inst.count; break;
-      case '+': *ptr += inst.count; break;
-      case '-': *ptr -= inst.count; break;
-      case '.': putchar(*ptr); break;
-      case ',': *ptr = getchar(); break;
+      case '>': ptr += inst.count; pc++; break;
+      case '+': *ptr += inst.count; pc++; break;
+      case '.': putchar(*ptr); pc++; break;
+      case ',': *ptr = getchar(); pc++; break;
       case '[':
-        if (*ptr == 0) {
-          size_t count = 1;
-          do {
-            pc++;
-            if (insts[pc].c == '[')
-              count++;
-            if (insts[pc].c == ']')
-              count--;
-          } while (count);
-        } else {
-          lbracket++;
-          *lbracket = pc;
-        }
+        if (*ptr) { pc++; } else { pc = inst.next; }
         break;
       case ']':
-        if (*ptr == 0) {
-          lbracket--;
-        } else {
-          pc = *lbracket;
-        }
+        if (*ptr) { pc = inst.prev; } else { pc++; }
         break;
       default:
         break;
     }
-    pc++;
   }
 }

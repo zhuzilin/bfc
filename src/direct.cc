@@ -11,13 +11,13 @@ struct instruct_t {
   void* label;
   char c;
   union {
-    char count;
+    int count;
     instruct_t* next;
     instruct_t* prev;
   };
 };
 
-bool is_cmd(char c) {
+inline bool is_cmd(char c) {
   return c == '>' || c == '<' || c == '+' || c == '-' ||
          c == '.' || c == ',' || c == '[' || c == ']';
 }
@@ -28,7 +28,6 @@ std::vector<instruct_t> compact(
 ) {
   std::vector<instruct_t> insts;
   size_t i = 0;
-  std::stack<size_t> lbracket;
   while (i < source.size()) {
     char c = source[i];
     i++;
@@ -41,6 +40,14 @@ std::vector<instruct_t> compact(
       while (i < source.size() && source[i] == c) {
         i++;
         inst.count++;
+      }
+      if (c == '<') {
+        inst.count = -inst.count;
+        inst.c = '>';
+      }
+      if (c == '-') {
+        inst.count = -inst.count;
+        inst.c = '+';
       }
     }
     insts.push_back(inst);
@@ -57,6 +64,9 @@ void link(std::vector<instruct_t>& insts) {
     if (insts[i].c == '[') {
       lbracket.push(i);
     } else if (insts[i].c == ']') {
+      if (lbracket.size() == 0) {
+        throw std::runtime_error("no pairing '[' for ']'");
+      }
       size_t j = lbracket.top();
       lbracket.pop();
       insts[j].next = insts.data() + i + 1;
@@ -89,17 +99,11 @@ int main(int argc, char* argv[]) {
 
   goto preprocess;
 
-move_right:  // >
+move:  // >
   ptr += inst->count; inst++;
-  goto *inst->label;
-move_left:   // <
-  ptr -= inst->count; inst++;
   goto *inst->label;
 add:  // +
   *ptr += inst->count; inst++;
-  goto *inst->label;
-sub:  // -
-  *ptr -= inst->count; inst++;
   goto *inst->label;
 dot:  // .
   putchar(*ptr); inst++;
@@ -118,10 +122,10 @@ end:
 
 preprocess:
   char2label = {
-    {'>', &&move_right},
-    {'<', &&move_left},
+    {'>', &&move},
+    {'<', &&move},
     {'+', &&add},
-    {'-', &&sub},
+    {'-', &&add},
     {'.', &&dot},
     {',', &&comma},
     {'[', &&lbrac},
